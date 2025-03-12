@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rating Distribution Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .rating-stats {
+            padding: 20px;
+        }
+        
+        #rating_distribution {
+            height: 500px;
+            margin-top: 2rem;
+        }
+
+        #rating_distribution_chart {
+            max-width: 100%;
+        }
+        /* Font settings */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="rating-stats">
+        <h1>Rating Distribution Chart</h1>
+        <div id="rating_distribution">
+            <canvas id="rating_distribution_chart"></canvas>
+        </div>
+    </div>
+    <script>
+        // Register Chart.js plugins
+        Chart.register(ChartDataLabels);
+
+        // Sample JSON data
+        // const ratings = Array.from({length: 45}, (_, i) => 400 + i * 25); // Ratings from 400 to 1500
+        // const freq = ratings.map(r => {
+        //     // Create a normal distribution centered at 1000 with std dev of 200
+        //     const mean = 1000;
+        //     const stdDev = 200;
+        //     return Math.round(100 * Math.exp(-Math.pow(r - mean, 2) / (2 * Math.pow(stdDev, 2))));
+        // });
+
+        // Sample Usage:
+        // const data = {
+        //     freq: freq,
+        //     myRating: 1000,
+        //     otherRating: 500
+        // };
+
+        function createDummyDistrubution() {
+            const minRating = 100;
+            const maxRating = 3100;
+            const binSize = 100;
+            const numberOfBins = Math.ceil((maxRating - minRating) / binSize);
+            
+            // Create ratings array
+            const ratings = Array.from({length: numberOfBins}, (_, i) => minRating + i * binSize);
+            
+            // Create frequency array with normal distribution
+            const freq = ratings.map(r => {
+                // Create a normal distribution centered at 1500 with std dev of 400
+                const mean = 1500;
+                const stdDev = 400;
+                // Scale factor of 1000 to simulate realistic player counts
+                return Math.round(1000 * Math.exp(-Math.pow(r - mean, 2) / (2 * Math.pow(stdDev, 2))));
+            });
+
+            // Calculate mean (for demonstration)
+            let totalPlayers = freq.reduce((a, b) => a + b, 0);
+            let weightedSum = ratings.reduce((sum, rating, i) => sum + rating * freq[i], 0);
+            let meanRating = weightedSum / totalPlayers;
+
+            return {
+                freq: freq,
+                ratings: ratings,
+                myRating: 1500,    // Example rating
+                otherRating: 1200, // Example rating
+                meanRating: meanRating
+            };
+        }
+
+        async function createRatingDistribution() {
+            // Player Ratings below & above are excluded
+            const minRating = 100;  // From your data
+            const maxRating = 3100; // From your data
+            const binSize = 100;     // Keep the same bin size for granularity
+            
+            // Calculate number of bins needed
+            const numberOfBins = Math.ceil((maxRating - minRating) / binSize);
+            
+            // Initialize arrays
+            const ratings = Array.from({ length: numberOfBins }, (_, i) => minRating + i * binSize);
+            const freq = new Array(numberOfBins).fill(0);
+
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/viczommers/Go-Rating-Distribution/refs/heads/main/ratings.jsonl');
+                const text = await response.text();
+                const lines = text.split('\n').filter(line => line.trim());
+                
+                let totalPlayers = 0;
+                let sumRatings = 0;
+                lines.forEach(line => {
+                    try {
+                        const data = JSON.parse(line);
+                        if (data.overall?.rating) {
+                            const rating = data.overall.rating;
+                            // Only process ratings within the valid range
+                            if (rating >= minRating && rating <= maxRating) {
+                                const binIndex = Math.floor((rating - minRating) / binSize);
+                                if (binIndex >= 0 && binIndex < numberOfBins) {
+                                    freq[binIndex]++;
+                                    totalPlayers++;
+                                    sumRatings += rating;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse line:', e);
+                    }
+                });
+
+                const meanRating = sumRatings / totalPlayers;  // Calculate mean
+
+                console.log('Total players:', totalPlayers);
+                console.log('Number of bins:', numberOfBins);
+                console.log('Bin size:', binSize);
+                console.log('Rating range:', minRating, 'to', maxRating);
+
+                return {
+                    freq: freq,
+                    ratings: ratings,
+                    myRating: null,    // These can be set later if needed
+                    otherRating: null,  // These can be set later if needed
+                    meanRating: meanRating
+                };
+                } catch (error) {
+                    console.error('Error fetching or processing JSONL:', error);
+                    throw error;
+                }
+            }
+            
+            const chartLabel = {
+                cumulative: 'Cumulative',
+                players: 'Players',
+                otherPlayer: 'Player2',
+                yourRating: 'Your rating',
+                glicko2Rating: 'Glicko2 Rating'
+            };
+
+        // This chart is adapted from the Lichess (https://github.com/lichess-org/lila)
+        // Original source ui/chart/src/chart.ratingDistribution.ts
+        // Licensed under the GNU Affero General Public License v3
+        // Modified for Go/Baduk ratings, 2025-03-12
+        function initModule(data) {
+            $('#rating_distribution_chart').each(function() {
+                const minRating = Math.min(...data.ratings);    // Get from actual data
+                const maxRating = Math.max(...data.ratings);
+                const binSize = data.ratings[1] - data.ratings[0];  // Calculate from actual data
+                
+                const arraySum = (arr) => arr.reduce((a, b) => a + b, 0);
+                const sum = arraySum(data.freq);
+                const cumul = [];
+                const ratings = data.ratings;
+                
+                // Calculate cumulative distribution
+                for (let i = 0; i < data.freq.length; i++) {
+                    cumul.push(arraySum(data.freq.slice(0, i)) / sum);
+                }
+
+                const ctx = this.getContext('2d');
+                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, 'rgba(119, 152, 191, 1)');
+                gradient.addColorStop(1, 'rgba(119, 152, 191, 0.3)');
+                const gridColor = 'rgba(0, 0, 0, 0.1)';
+                const hoverBorderColor = '#fff';
+
+                const seriesCommonData = (color) => ({
+                    pointHoverRadius: 6,
+                    pointHoverBorderWidth: 2,
+                    pointHoverBorderColor: hoverBorderColor,
+                    borderColor: color,
+                    pointBackgroundColor: color,
+                });
+
+                const datasets = [
+                    {
+                        ...seriesCommonData('#dddf0d'),
+                        data: cumul,
+                        yAxisID: 'y2',
+                        label: chartLabel.cumulative,
+                        pointRadius: 0,
+                        datalabels: { display: false },
+                        pointHitRadius: 200,
+                        order: 1 
+                    },
+                    {
+                        ...seriesCommonData('#eeaaee'),
+                        data: data.freq,
+                        backgroundColor: gradient,
+                        yAxisID: 'y',
+                        fill: true,
+                        label: chartLabel.players,
+                        pointRadius: 4,
+                        datalabels: { display: false },
+                        pointHitRadius: 200,
+                        order: 3 
+                    }
+                ];
+
+                // Add rating lines
+                const pushLine = (color, rating, label) => {
+                    datasets.push({
+                        ...seriesCommonData(color),
+                        yAxisID: 'y2',
+                        data: [
+                            { x: rating, y: 0 },
+                            { x: rating, y: Math.max(...cumul)}
+                        ],
+                        segment: {
+                            borderDash: [10],
+                        },
+                        label: label,
+                        pointRadius: 4,
+                        datalabels: {
+                            align: 'top',
+                            offset: 0,
+                            display: 'auto',
+                            formatter: (value) => value.y === 0 ? '' : label,
+                            color: color,
+                        },
+                        order: 2
+                        // animations: false
+                    });
+                };
+
+                if (data.myRating && data.myRating <= maxRating) {
+                    pushLine('#55bf3b', data.myRating, `${chartLabel.yourRating} (${data.myRating})`);
+                }
+                if (data.otherRating && chartLabel.otherPlayer) {
+                    pushLine('#7798bf', Math.min(data.otherRating, maxRating), `${chartLabel.otherPlayer} (${data.otherRating})`);
+                }
+                // pushLine('#7798bf', 1500, `Starting score`);
+                // pushLine('#7798bf', data.meanRating, `Mean score`);
+
+                new Chart(this, {
+                    type: 'line',
+                    data: {
+                        labels: ratings,
+                        datasets: datasets
+                    },
+                    options: {
+                        // animations: {
+                        //     x: {
+                        //         type: 'number',
+                        //         easing: 'easeOutQuad',
+                        //         duration: 1000 / ratings.length,
+                        //         from: NaN, // the point is initially skipped
+                        //         delay(ctx) {
+                        //             return ctx.mode === 'resize' ? 0 : ctx.dataIndex * (1000 / ratings.length);
+                        //         }
+                        //     },
+                        //     y: {
+                        //         type: 'number',
+                        //         easing: 'easeOutQuad',
+                        //         duration: 1000 / ratings.length,
+                        //         from(ctx) {
+                        //             if (!ctx.dataIndex) {
+                        //                 return ctx.chart.scales.y.getPixelForValue(100);
+                        //             }
+                        //             return ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.dataIndex - 1].getProps(['y'], true).y;
+                        //         },
+                        //         delay(ctx) {
+                        //             return ctx.mode === 'resize' ? 0 : ctx.dataIndex * (1000 / ratings.length);
+                        //         }
+                        //     }
+                        // },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                min: Math.min(...ratings),
+                                max: maxRating,
+                                grid: {
+                                    color: gridColor,
+                                },
+                                ticks: {
+                                    stepSize: 100,
+                                },
+                                title: {
+                                    display: true,
+                                    text: chartLabel.glicko2Rating,
+                                }
+                            },
+                            y: {
+                                grid: {
+                                    color: gridColor,
+                                    tickLength: 0,
+                                },
+                                ticks: {
+                                    padding: 10,
+                                },
+                                title: {
+                                    display: true,
+                                    text: chartLabel.players,
+                                }
+                            },
+                            y2: {
+                                position: 'right',
+                                grid: {
+                                    display: false,
+                                },
+                                ticks: {
+                                    format: {
+                                        style: 'percent',
+                                        maximumFractionDigits: 1,
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: chartLabel.cumulative,
+                                }
+                            }
+                        },
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                align: 'center',    
+                                labels: {
+                                    boxHeight: 30, 
+                                    boxWidth: 30,  
+                                    padding: 10  
+                                }
+                            },
+                            tooltip: {
+                                caretPadding: 8,
+                                callbacks: {
+                                    label: item => (item.datasetIndex > 1 ? item.dataset.label : undefined)
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+
+        // Initialize the chart statically
+        // initModule(data);
+
+        // Initialize the dummy data
+        // const dummyData = createDummyDistrubution();
+        // initModule(dummyData);
+        
+        // Initialize everything when document is ready
+        $(document).ready(async function() {
+            try {
+                // const { ratings, freq } = await createRatingArrays();
+                const distribution = await createRatingDistribution();
+                console.log('Ratings:', distribution.ratings);
+                console.log('Frequencies:', distribution.freq);
+
+                const data = {
+                    // freq: freq,
+                    freq: distribution.freq,
+                    ratings: distribution.ratings, 
+                    myRating: 1000,
+                    otherRating: 500,
+                    meanRating: distribution.meanRating
+                };
+                initModule(data);
+            } catch (error) {
+                console.error('Failed to initialize chart:', error);
+            }
+        });
+    </script>
+</body>
+</html>
