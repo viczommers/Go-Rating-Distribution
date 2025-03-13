@@ -33,6 +33,7 @@
             <canvas id="rating_distribution_chart"></canvas>
         </div>
     </div>
+    <span>Footnotes: Each point represents the number of players with ratings from (X-1)01 to X00, where X00 is included. For example, the 1600 point shows all players rated 1501-1600.</span>
     <script>
         // Register Chart.js plugins
         Chart.register(ChartDataLabels);
@@ -58,7 +59,6 @@
             const maxRating = 3100;
             const binSize = 100;
             const numberOfBins = Math.ceil((maxRating - minRating) / binSize);
-            
             // Create ratings array
             const ratings = Array.from({length: numberOfBins}, (_, i) => minRating + i * binSize);
             
@@ -112,7 +112,8 @@
                             const rating = data.overall.rating;
                             // Only process ratings within the valid range
                             if (rating >= minRating && rating <= maxRating) {
-                                const binIndex = Math.floor((rating - minRating) / binSize);
+                                // const binIndex = Math.floor((rating - minRating) / binSize);
+                                const binIndex = Math.floor((rating - minRating + binSize - 1) / binSize);
                                 if (binIndex >= 0 && binIndex < numberOfBins) {
                                     freq[binIndex]++;
                                     totalPlayers++;
