@@ -4,7 +4,7 @@ from datetime import datetime
 # from typing import Dict
 
 def ratings_histogram(overall_ratings: list[dict]) -> bytes:
-    """Transform list of overall raing objects into distribution histogram.
+    """Transform list of overall rating objects into distribution histogram.
     Args:
         overall_ratings: List of overall rating objects
     Returns:
@@ -50,8 +50,7 @@ def ratings_histogram(overall_ratings: list[dict]) -> bytes:
             mean_rating = None
 
         # Check if the length of freq and ratings are the same
-        if len(freq) != len(ratings):
-            raise ValueError(f"Length mismatch: freq ({len(freq)}) != ratings ({len(ratings)})")
+        if len(freq) != len(ratings): raise ValueError()
     except:
         # Return empty distribution on any error
         return orjson.dumps({
