@@ -55,12 +55,12 @@
         // };
 
         function createDummyDistrubution() {
-            const minRating = 100; // min rating assumption
-            const maxRating = 3100; // max rating assumption
+            const MIN_RATING = 100; // min rating assumption
+            const MAX_RATING = 3100; // max rating assumption
             const binSize = 100;
-            const numberOfBins = Math.ceil((maxRating - minRating) / binSize);
+            const numberOfBins = Math.ceil((MAX_RATING - MIN_RATING) / binSize);
             // Create ratings array
-            const ratings = Array.from({length: numberOfBins}, (_, i) => minRating + i * binSize);
+            const ratings = Array.from({length: numberOfBins}, (_, i) => MIN_RATING + i * binSize);
             
             // Create frequency array with normal distribution
             const freq = ratings.map(r => {
@@ -87,18 +87,19 @@
 
         async function createRatingDistribution() {
             // Player Ratings below & above are excluded
-            const minRating = 100;  // min rating assumption
-            const maxRating = 3100; // max rating assumption
+            const MIN_RATING = 100;  // min rating assumption
+            const MAX_RATING = 3100; // max rating assumption
+            const MAX_DEVIATION = 200; // max deviation filter
             const binSize = 100;     // Keep the same bin size for granularity
             
             // Calculate number of bins needed
-            const numberOfBins = Math.ceil((maxRating - minRating) / binSize);
+            const numberOfBins = Math.ceil((MAX_RATING - MIN_RATING) / binSize);
             
             // Initialize arrays
-            const ratings = Array.from({ length: numberOfBins }, (_, i) => minRating + i * binSize);
+            const ratings = Array.from({ length: numberOfBins }, (_, i) => MIN_RATING + i * binSize);
             const freq = new Array(numberOfBins).fill(0);
-            const totalPlayers = 0;
-            const sumRatings = 0;
+            let totalPlayers = 0;
+            let sumRatings = 0;
 
             try {
                 const response = await fetch('https://raw.githubusercontent.com/viczommers/Go-Rating-Distribution/refs/heads/main/ratings.jsonl').catch(() => null);
@@ -112,9 +113,9 @@
                                 const rating = data.overall.rating;
                                 const deviation = data.overall?.deviation ?? 0;  
                                 // Only process ratings within the valid range
-                                if (rating >= minRating && rating <= maxRating && deviation < 201) {
-                                    // const binIndex = Math.floor((rating - minRating) / binSize);
-                                    const binIndex = Math.floor((rating - minRating + binSize - 1) / binSize);
+                                if (rating >= MIN_RATING && rating <= MAX_RATING && deviation <= MAX_DEVIATION) {
+                                    // const binIndex = Math.floor((rating - MIN_RATING) / binSize);
+                                    const binIndex = Math.floor((rating - MIN_RATING + binSize - 1) / binSize);
                                     if (binIndex >= 0 && binIndex < numberOfBins) {
                                         freq[binIndex]++;
                                         totalPlayers++;
@@ -128,11 +129,11 @@
                     });
                 }
 
-                const meanRating = totalPlayers > 0 ? sumRatings / totalPlayers : 0;  // Calculate mean
+                let meanRating = totalPlayers > 0 ? sumRatings / totalPlayers : 0;  // Calculate mean
                 console.log('Total players:', totalPlayers);
                 console.log('Number of bins:', numberOfBins);
                 console.log('Bin size:', binSize);
-                console.log('Rating range:', minRating, 'to', maxRating);
+                console.log('Rating range:', MIN_RATING, 'to', MAX_RATING);
 
                 return {
                     freq: freq,
@@ -161,8 +162,8 @@
         // Modified for Go/Baduk ratings, 2025-03-12
         function initModule(data) {
             $('#rating_distribution_chart').each(function() {
-                const minRating = Math.min(...data.ratings);    // Get from actual data
-                const maxRating = Math.max(...data.ratings);
+                const MIN_RATING = Math.min(...data.ratings);    // Get from actual data
+                const MAX_RATING = Math.max(...data.ratings);
                 const binSize = data.ratings[1] - data.ratings[0];  // Calculate from actual data
                 
                 const arraySum = (arr) => arr.reduce((a, b) => a + b, 0);
@@ -241,19 +242,19 @@
                     });
                 };
 
-                if (data.myRating && data.myRating <= maxRating) {
+                if (data.myRating && data.myRating <= MAX_RATING) {
                     pushLine('#55bf3b', data.myRating, `${chartLabel.yourRating} (${data.myRating})`);
                 }
                 if (data.otherRating && chartLabel.otherPlayer) {
-                    pushLine('#7798bf', Math.min(data.otherRating, maxRating), `${chartLabel.otherPlayer} (${data.otherRating})`);
+                    pushLine('#7798bf', Math.min(data.otherRating, MAX_RATING), `${chartLabel.otherPlayer} (${data.otherRating})`);
                 }
                 // pushLine('#7798bf', 1500, `Starting score`);
                 // pushLine('#7798bf', data.meanRating, `Mean score`);
                 const firstNonZeroIndex = data.freq.findIndex(f => f > 0);
                 const lastNonZeroIndex = data.freq.length - 1 - [...data.freq].reverse().findIndex(f => f > 0);
                 
-                const effectiveMinRating = firstNonZeroIndex === -1 ? minRating : data.ratings[firstNonZeroIndex];
-                const effectiveMaxRating = firstNonZeroIndex === -1 ? maxRating : data.ratings[lastNonZeroIndex];
+                const effectiveMinRating = firstNonZeroIndex === -1 ? MIN_RATING : data.ratings[firstNonZeroIndex];
+                const effectiveMaxRating = firstNonZeroIndex === -1 ? MAX_RATING : data.ratings[lastNonZeroIndex];
 
                 new Chart(this, {
                     type: 'line',
