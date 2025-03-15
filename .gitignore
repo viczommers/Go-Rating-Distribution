@@ -26,4 +26,5 @@ Thumbs.db
 dist/
 build/
 
+__pycache__/
 test.ipynb

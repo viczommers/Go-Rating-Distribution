@@ -3,7 +3,7 @@ import numpy as np
 from datetime import datetime
 # from typing import Dict
 
-def transform_ratings(overall_ratings: list[dict]) -> bytes:
+def ratings_histogram(overall_ratings: list[dict]) -> bytes:
     """Transform list of overall raing objects into distribution histogram.
     Args:
         overall_ratings: List of overall rating objects
