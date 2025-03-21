@@ -47,7 +47,7 @@ export async function createRatingDistribution() {
 
     try {
         // Old static jsonl
-        const response = await fetch('https://raw.githubusercontent.com/viczommers/Go-Rating-Distribution/refs/heads/main/ratings.jsonl').catch(() => null);
+        const response = await fetch('./static/ratings.jsonl').catch(() => null);
         if (response) {
             const text = await response.text();
             const lines = text.split('\n').filter(line => line.trim());
