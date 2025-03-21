@@ -1,0 +1,16 @@
+.rating-stats {
+    padding: 20px;
+}
+
+#rating_distribution {
+    height: 500px;
+    margin-top: 2rem;
+}
+
+#rating_distribution_chart {
+    max-width: 100%;
+}
+/* Font settings */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
