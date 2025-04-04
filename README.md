@@ -1,5 +1,6 @@
 # Go-Rating-Distribution
 ## [**🔗📊 Histogram Chart Link**](https://viczommers.github.io/Go-Rating-Distribution/)
+Implemented in [PR#3009](https://github.com/online-go/online-go.com/pull/), [PR#3029](https://github.com/online-go/online-go.com/pull/3029), [PR#3032](https://github.com/online-go/online-go.com/pull/3032), [PR#3037](https://github.com/online-go/online-go.com/pull/3037) 
 ## Rating System
 Players with Rating Deviation (RD) of >200 are excluded.
 Each bin point represents the count of players with ratings from (X-1)01 to X00, where X00 is included. For example, the 1600 point shows all players rated 1501-1600.<br>
